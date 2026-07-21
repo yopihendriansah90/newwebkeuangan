@@ -25,7 +25,7 @@ class TransactionInputNormalizer
         if ($value === '' || in_array($value, ['hari ini','hariini','today'], true)) return $now->toDateString();
         if (in_array($value, ['kemarin','kemaren','yesterday'], true)) return $now->copy()->subDay()->toDateString();
         if (preg_match('/^(\d+)\s*hari\s*(yang\s*)?lalu$/', $value, $match)) return $now->copy()->subDays((int) $match[1])->toDateString();
-        foreach (['d/m/Y','d-m-Y','d.m.Y'] as $format) { try { return Carbon::createFromFormat($format, $value)->toDateString(); } catch (\Throwable) {} }
+        foreach (['Y-m-d','d/m/Y','d-m-Y','d.m.Y'] as $format) { try { return Carbon::createFromFormat($format, $value)->toDateString(); } catch (\Throwable) {} }
         foreach (['d/m','d-m','d.m'] as $format) { try { return Carbon::createFromFormat($format, $value)->setYear($activeYear)->toDateString(); } catch (\Throwable) {} }
         if (preg_match('/^\d{1,2}$/', $value)) { $day=(int)$value; if (checkdate($activeMonth,$day,$activeYear)) return Carbon::create($activeYear,$activeMonth,$day)->toDateString(); }
         throw new InvalidArgumentException('Tanggal tidak dikenali.');
