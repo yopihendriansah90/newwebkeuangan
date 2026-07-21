@@ -18,7 +18,7 @@ class GroqTransactionParser
             // lebih kompatibel, sementara struktur detail tetap diarahkan lewat prompt.
             'model'=>$model, 'temperature'=>0, 'response_format'=>['type'=>'json_object'],
             'messages'=>[
-                ['role'=>'system','content'=>'Kamu adalah parser transaksi keuangan pribadi berbahasa Indonesia. Jangan menyimpan data dan jangan memberi penjelasan di luar JSON. Pahami typo ringan. Jenis income untuk uang masuk dan expense untuk uang keluar. Nominal harus angka Rupiah tanpa titik atau simbol. Jika tanggal hanya berupa angka hari, gunakan bulan aktif dan tahun aktif. Hari ini adalah '.$today.'. Bulan aktif adalah '.$activeMonth.' dan tahun aktif adalah '.$activeYear.'. Jika bukan transaksi, gunakan intent query atau unknown. Jika data penting tidak jelas, masukkan ke missing_fields.'],
+                ['role'=>'system','content'=>'Kamu adalah parser transaksi keuangan pribadi berbahasa Indonesia. Balas HANYA satu JSON valid tanpa markdown dengan field persis: intent, type, description, amount, date_expression, category, confidence, missing_fields. intent harus create_transaction jika user mencatat uang, query jika bertanya, atau unknown. type harus income untuk uang masuk dan expense untuk uang keluar. Kata pemasukan: gaji, bonus, thr, terima, dapat, masuk, bayaran, freelance, penjualan. Kata pengeluaran: makan, jajan, beli, bayar, belanja, bensin, ongkos, pulsa, listrik, sewa, cicilan. Kata transfer saja ambigu: type harus unknown dan missing_fields berisi type. Nominal harus berupa angka Rupiah, misalnya 10K menjadi 10000, 1,5 juta menjadi 1500000, 500.000 menjadi 500000. Pahami typo ringan. Deskripsi adalah inti kegiatan, bukan seluruh kalimat. Kategori adalah kategori umum seperti Makanan, Transportasi, Tagihan, Belanja, Gaji, Bonus, atau kosong jika belum jelas. Tanggal hanya angka berarti tanggal pada bulan aktif dan tahun aktif. Dukung hari ini, tadi, kemarin, tanggal 12, tanggal 5 bulan lalu, 12/09/2026, dan nama bulan Indonesia. Hari ini adalah '.$today.'. Bulan aktif adalah '.$activeMonth.' dan tahun aktif adalah '.$activeYear.'. Contoh JSON untuk "makan 10k": {"intent":"create_transaction","type":"expense","description":"makan","amount":10000,"date_expression":"hari ini","category":"Makanan","confidence":0.98,"missing_fields":[]}. Jika informasi penting tidak jelas, masukkan nama field-nya ke missing_fields.'],
                 ['role'=>'user','content'=>$text],
             ],
         ]);
@@ -32,6 +32,9 @@ class GroqTransactionParser
         $parsed['amount'] ??= $parsed['nominal'] ?? 0;
         $parsed['date_expression'] ??= $parsed['tanggal'] ?? '';
         $parsed['category'] ??= $parsed['kategori'] ?? '';
+        $typeText = mb_strtolower((string) ($parsed['type'] ?? $parsed['jenis_transaksi'] ?? ''));
+        if (in_array($typeText, ['pemasukan','masuk','income'], true)) $parsed['type'] = 'income';
+        if (in_array($typeText, ['pengeluaran','keluar','expense'], true)) $parsed['type'] = 'expense';
         if (($parsed['type'] ?? 'unknown') === 'unknown' && in_array($parsed['intent'] ?? '', ['income', 'expense'], true)) {
             $parsed['type'] = $parsed['intent'];
             $parsed['intent'] = 'create_transaction';
