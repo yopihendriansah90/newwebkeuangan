@@ -1,0 +1,3 @@
+<?php
+use Illuminate\Database\Migrations\Migration; use Illuminate\Database\Schema\Blueprint; use Illuminate\Support\Facades\Schema;
+return new class extends Migration { public function up(): void { Schema::create('pending_transactions', function (Blueprint $table) { $table->id(); $table->foreignId('wallet_id')->constrained()->cascadeOnDelete(); $table->foreignId('user_id')->constrained()->cascadeOnDelete(); $table->string('chat_id'); $table->json('payload'); $table->enum('status',['pending','saved','cancelled'])->default('pending'); $table->timestamp('expires_at'); $table->timestamps(); $table->index(['chat_id','status']); }); } public function down(): void { Schema::dropIfExists('pending_transactions'); } };

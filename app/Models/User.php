@@ -12,8 +12,11 @@ class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
-    public function categories() { return $this->hasMany(Category::class); }
-    public function transactions() { return $this->hasMany(Transaction::class); }
+    public function wallets() { return $this->belongsToMany(Wallet::class, 'wallet_members')->withPivot('role')->withTimestamps(); }
+    public function wallet() { return $this->wallets()->first(); }
+    public function walletCategories() { return $this->wallet()?->categories() ?? Category::whereRaw('1 = 0'); }
+    public function walletTransactions() { return $this->wallet()?->transactions() ?? Transaction::whereRaw('1 = 0'); }
+    public function categories() { return $this->walletCategories(); }
 
     /**
      * The attributes that are mass assignable.
