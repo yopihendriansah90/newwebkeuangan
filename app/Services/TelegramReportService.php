@@ -9,12 +9,18 @@ use Illuminate\Support\Collection;
 
 class TelegramReportService
 {
+    public function __construct(private FinancialAnalysisService $analysis) {}
+
     public function respond(Wallet $wallet, string $input, Carbon $now): ?string
     {
         $text = mb_strtolower(trim($input));
         if (!$this->isReportRequest($text)) return null;
 
         [$from, $to, $period] = $this->period($text, $now);
+
+        if (str_contains($text, 'analisa') || str_contains($text, 'insight') || str_contains($text, 'kondisi keuangan')) {
+            return $this->analysisText($wallet, $from, $to, $period);
+        }
 
         if (preg_match('/^(\/saldo|saldo|sisa uang|saldo sekarang)/', $text)) {
             return $this->summary($wallet, $from, $to, $period, false);
@@ -47,8 +53,8 @@ class TelegramReportService
 
     private function isReportRequest(string $text): bool
     {
-        if (preg_match('/^\/(saldo|laporan|ringkasan|transaksi|pengeluaran|pemasukan|cari)(?:@\w+)?(?:\s|$)/', $text)) return true;
-        if (preg_match('/\b(saldo|sisa uang|laporan|ringkasan|pemasukan|pengeluaran|total pemasukan|total pengeluaran|transaksi terbaru|transaksi terakhir|paling banyak|bandingkan|dibandingkan|bulan ini|bulan lalu|minggu ini|hari ini|pengeluaran terbesar|pemasukan terbesar|cari transaksi|pernah bayar)\b/', $text)) {
+        if (preg_match('/^\/(saldo|laporan|analisa|ringkasan|transaksi|pengeluaran|pemasukan|cari)(?:@\w+)?(?:\s|$)/', $text)) return true;
+        if (preg_match('/\b(analisa|insight|kondisi keuangan|saldo|sisa uang|laporan|ringkasan|pemasukan|pengeluaran|total pemasukan|total pengeluaran|transaksi terbaru|transaksi terakhir|paling banyak|bandingkan|dibandingkan|bulan ini|bulan lalu|minggu ini|hari ini|pengeluaran terbesar|pemasukan terbesar|cari transaksi|pernah bayar)\b/', $text)) {
             return !preg_match('/\d+(?:[.,]\d+)?\s*(k|rb|ribu|jt|juta)?\b/', $text);
         }
         return false;
@@ -93,6 +99,15 @@ class TelegramReportService
     {
         $total = (float) $this->query($wallet, $from, $to)->where('type', $type)->sum('amount');
         return "Total {$label} {$period}: Rp ".$this->money($total);
+    }
+
+    private function analysisText(Wallet $wallet, Carbon $from, Carbon $to, string $period): string
+    {
+        $data = $this->analysis->analyze($wallet, $from, $to);
+        $result = "Analisa {$period}\n\nPemasukan: Rp ".$this->money($data['income'])."\nPengeluaran: Rp ".$this->money($data['expense'])."\nSisa saldo: Rp ".$this->money($data['balance'])."\nJumlah transaksi: {$data['count']}\nRata-rata pengeluaran/hari: Rp ".$this->money($data['average_daily_expense']);
+        if ($data['largest_category']) $result .= "\n\nKategori terbesar: {$data['largest_category']} (Rp ".$this->money($data['largest_category_amount']).')';
+        if ($data['largest_transaction']) $result .= "\nTransaksi terbesar: {$data['largest_transaction']->description} (Rp ".$this->money($data['largest_transaction']->amount).')';
+        return $result;
     }
 
     private function latest(Wallet $wallet, Carbon $from, Carbon $to, string $period): string

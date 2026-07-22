@@ -25,7 +25,7 @@ class TransactionInputNormalizer
         $value = strtolower(trim((string) $expression));
         $value = preg_replace('/^(tanggal|tgl)\s+/i', '', $value);
         if ($value === '' || in_array($value, ['hari ini','hariini','today'], true)) return $now->toDateString();
-        if (in_array($value, ['tadi','sekarang'], true)) return $now->toDateString();
+        if (in_array($value, ['tadi','sekarang'], true) || str_contains($value, 'tadi')) return $now->toDateString();
         if (in_array($value, ['kemarin','kemaren','yesterday'], true)) return $now->copy()->subDay()->toDateString();
         if ($value === 'besok') return $now->copy()->addDay()->toDateString();
         if (preg_match('/^(\d+)\s*hari\s*(yang\s*)?lalu$/', $value, $match)) return $now->copy()->subDays((int) $match[1])->toDateString();
