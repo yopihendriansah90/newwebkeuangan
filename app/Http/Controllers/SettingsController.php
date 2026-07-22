@@ -2,7 +2,7 @@
 namespace App\Http\Controllers;
 use App\Models\SystemSetting; use Illuminate\Http\Request; use Illuminate\Support\Facades\Http;
 class SettingsController extends Controller {
- private function owner(){ $wallet=auth()->user()->wallet(); abort_unless($wallet && $wallet->members()->where('user_id',auth()->id())->wherePivot('role','owner')->exists(),403); return $wallet; }
+ private function owner(){ return \App\Models\Wallet::shared() ?? abort(500, 'Wallet utama belum tersedia.'); }
  private function setting(string $key,?string $fallback=null):?string{return SystemSetting::read($key,$fallback);}
  private function telegramUrl(string $method):string{return 'https://api.telegram.org/bot'.$this->setting('telegram_bot_token',config('services.telegram.bot_token')).'/'.$method;}
  public function index(){ $this->owner(); $telegramConfigured=(bool)$this->setting('telegram_bot_token',config('services.telegram.bot_token')); $groqConfigured=(bool)$this->setting('groq_api_key',config('services.groq.api_key')); $webhook=null; if($telegramConfigured){try{$webhook=Http::timeout(8)->get($this->telegramUrl('getWebhookInfo'))->json('result');}catch(\Throwable $e){$webhook=['last_error_message'=>$e->getMessage()];}} return view('settings',compact('telegramConfigured','groqConfigured','webhook')); }

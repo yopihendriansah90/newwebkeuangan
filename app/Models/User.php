@@ -15,10 +15,7 @@ class User extends Authenticatable
     public function wallets() { return $this->belongsToMany(Wallet::class, 'wallet_members')->withPivot('role')->withTimestamps(); }
     public function wallet()
     {
-        // Jika akun memiliki lebih dari satu relasi wallet, gunakan wallet
-        // bersama yang memiliki anggota terbanyak agar authorization item
-        // tidak salah membaca wallet personal/duplikat.
-        return $this->wallets()->withCount('members')->orderByDesc('members_count')->first();
+        return Wallet::shared();
     }
     public function walletCategories() { return $this->wallet()?->categories() ?? Category::whereRaw('1 = 0'); }
     public function walletTransactions() { return $this->wallet()?->transactions() ?? Transaction::whereRaw('1 = 0'); }
