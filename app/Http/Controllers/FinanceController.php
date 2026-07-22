@@ -57,7 +57,10 @@ class FinanceController extends Controller
         $data = $this->ledgerContext($request);
         $transactions = $data['transactions'];
         if ($request->input('view', 'modern') !== 'ledger') $transactions = $transactions->sortByDesc(fn ($transaction) => [$transaction->transaction_date->timestamp, $transaction->id])->values();
-        return view('dashboard', $data + compact('transactions'));
+        // Modern view harus menggunakan hasil sorting terbaru, sedangkan
+        // buku kas tetap memakai urutan lama ke baru dari ledgerContext().
+        $data['transactions'] = $transactions;
+        return view('dashboard', $data);
     }
 
     public function exportLedger(Request $request)
