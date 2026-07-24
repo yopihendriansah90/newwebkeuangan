@@ -50,6 +50,7 @@ class GroqTransactionParser
         if (!$apiKey) throw new RuntimeException('API key Groq belum dikonfigurasi.');
 
         $model = SystemSetting::read('groq_vision_model', config('services.groq.vision_model'));
+        if ($model === 'meta-llama/llama-4-scout-17b-16e-instruct') $model = 'qwen/qwen3.6-27b';
         $response = Http::timeout(60)->withToken($apiKey)->post('https://api.groq.com/openai/v1/chat/completions', [
             'model' => $model,
             'temperature' => 0,
