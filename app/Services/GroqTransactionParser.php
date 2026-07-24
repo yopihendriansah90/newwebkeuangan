@@ -43,4 +43,39 @@ class GroqTransactionParser
         }
         return array_merge(['intent'=>'unknown','type'=>'unknown','description'=>'','amount'=>0,'date_expression'=>'','category'=>'','confidence'=>0,'missing_fields'=>[]], $parsed);
     }
+
+    public function parseImage(string $imageDataUrl, string $today, int $activeMonth, int $activeYear): array
+    {
+        $apiKey = SystemSetting::read('groq_api_key', config('services.groq.api_key'));
+        if (!$apiKey) throw new RuntimeException('API key Groq belum dikonfigurasi.');
+
+        $model = SystemSetting::read('groq_vision_model', config('services.groq.vision_model'));
+        $response = Http::timeout(60)->withToken($apiKey)->post('https://api.groq.com/openai/v1/chat/completions', [
+            'model' => $model,
+            'temperature' => 0,
+            'messages' => [[
+                'role' => 'system',
+                'content' => 'Kamu adalah pembaca nota pembayaran dan parser transaksi keuangan Indonesia. Balas HANYA JSON valid tanpa markdown dengan field persis: intent, type, description, amount, date_expression, category, confidence, missing_fields. Baca tulisan cetak maupun tulisan tangan dengan hati-hati. Selalu anggap nota sebagai pengeluaran, kecuali jelas merupakan bukti pemasukan. amount adalah total pembayaran dalam Rupiah sebagai angka. Jika tanggal nota terbaca gunakan tanggal tersebut; jika tidak, gunakan hari ini. description ringkas dan informatif, misalnya "Belanja di Shinta Mart". category boleh Makanan, Belanja, Tagihan, Transportasi, atau kosong jika tidak yakin. Hari ini adalah '.$today.'. Bulan aktif adalah '.$activeMonth.' dan tahun aktif adalah '.$activeYear.'. Jika total tidak terbaca, amount harus 0 dan missing_fields berisi amount.',
+            ], [
+                'role' => 'user',
+                'content' => [
+                    ['type' => 'text', 'text' => 'Baca nota ini dan siapkan transaksi untuk dikonfirmasi.'],
+                    ['type' => 'image_url', 'image_url' => ['url' => $imageDataUrl]],
+                ],
+            ]],
+        ]);
+        if (!$response->successful()) throw new RuntimeException($response->json('error.message', 'Groq gagal membaca gambar nota.'));
+        $content = $response->json('choices.0.message.content');
+        $content = is_string($content) ? trim(preg_replace('/^```(?:json)?|```$/i', '', $content)) : $content;
+        $parsed = is_string($content) ? json_decode($content, true) : $content;
+        if (!is_array($parsed) || json_last_error() !== JSON_ERROR_NONE) throw new RuntimeException('Hasil pembacaan nota tidak valid.');
+        $parsed['type'] = 'expense';
+        $parsed['intent'] = 'create_transaction';
+        $parsed['description'] ??= $parsed['keterangan'] ?? 'Pembayaran dari nota';
+        $parsed['amount'] ??= $parsed['nominal'] ?? 0;
+        $parsed['date_expression'] ??= $parsed['tanggal'] ?? 'hari ini';
+        $parsed['category'] ??= $parsed['kategori'] ?? '';
+        $parsed['missing_fields'] ??= [];
+        return array_merge(['intent'=>'create_transaction','type'=>'expense','description'=>'Pembayaran dari nota','amount'=>0,'date_expression'=>'hari ini','category'=>'','confidence'=>0,'missing_fields'=>[]], $parsed);
+    }
 }
