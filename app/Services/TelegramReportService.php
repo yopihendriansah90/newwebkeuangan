@@ -7,6 +7,7 @@ use App\Models\PendingTransaction;
 use App\Models\Wallet;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 
 class TelegramReportService
 {
@@ -16,8 +17,10 @@ class TelegramReportService
     {
         // Saat ada field transaksi yang sedang diedit, jangan anggap pesan
         // seperti "pemasukan" atau "kemarin" sebagai permintaan laporan.
-        if ($this->hasPendingEdit()) return null;
         $text = mb_strtolower(trim($input));
+        if (in_array($text, ['/reset', 'reset'], true)) return $this->resetResponse();
+        if ($this->hasPendingEdit()) return null;
+        if ($social = $this->socialResponse($text)) return $social;
         if (!$this->isReportRequest($text)) return null;
 
         [$from, $to, $period] = $this->period($text, $now);
@@ -65,6 +68,38 @@ class TelegramReportService
             ->latest()
             ->get()
             ->contains(fn (PendingTransaction $pending): bool => $pending->state() === 'editing');
+    }
+
+    private function socialResponse(string $text): ?string
+    {
+        $text = trim(preg_replace('/\s+/', ' ', $text) ?? $text);
+        if (preg_match('/^(?:\/reset|reset|halo|hai|hi|hello|pagi|siang|sore|malam|selamat pagi|selamat siang|selamat sore|selamat malam)(?:[!. ]|$)/u', $text)) {
+            return "Halo! Saya asisten keuangan kamu 👋\n\nSaya bisa membantu mencatat transaksi, melihat saldo, membuat laporan, menganalisa keuangan, dan membaca foto nota.\n\nCoba kirim: makan 10k kemarin";
+        }
+        if (preg_match('/^(?:terima kasih|makasih|thanks|thank you|oke makasih|sip makasih)(?:[!. ]|$)/u', $text)) {
+            return 'Sama-sama 😊 Saya siap membantu mencatat dan memantau keuangan kamu.';
+        }
+        if (preg_match('/^(?:apa kabar|kamu apa kabar|gimana kabarnya)(?:[?! .]|$)/u', $text)) {
+            return 'Saya baik dan siap membantu kamu mengatur keuangan hari ini 😊';
+        }
+        if (preg_match('/^(?:siapa kamu|kamu siapa|kamu bisa apa|bisa apa saja|fitur kamu apa)(?:[?! .]|$)/u', $text)) {
+            return "Saya asisten keuangan pribadi kamu.\n\nSaya bisa:\n• mencatat pemasukan dan pengeluaran\n• membaca foto nota\n• melihat saldo dan laporan\n• membuat analisa keuangan\n• mengelola kategori\n• mengedit transaksi sebelum disimpan\n\nKirim /bantuan untuk melihat contoh lengkap.";
+        }
+        return null;
+    }
+
+    private function resetResponse(): string
+    {
+        $chatId = (string) request()->input('message.chat.id', '');
+        $pending = PendingTransaction::where('chat_id', $chatId)->where('status', 'pending')->latest()->first();
+        if ($pending) {
+            if ($path = data_get($pending->payload, 'receipt_path')) {
+                Storage::disk('local')->delete($path);
+                Storage::disk('public')->delete($path);
+            }
+            $pending->update(['status' => 'cancelled']);
+        }
+        return 'Sesi dibersihkan. Sekarang kita kembali ke mode chat normal 😊';
     }
 
     private function isReportRequest(string $text): bool
