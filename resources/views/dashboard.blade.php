@@ -1,11 +1,187 @@
 @extends('layout') @section('content')
-@php($monthNames = [1=>'Januari',2=>'Februari',3=>'Maret',4=>'April',5=>'Mei',6=>'Juni',7=>'Juli',8=>'Agustus',9=>'September',10=>'Oktober',11=>'November',12=>'Desember'])
-<div class="page-heading"><div><p class="eyebrow">RINGKASAN KEUANGAN</p><h1>Halo, {{ auth()->user()->name }} <span>👋</span></h1><p class="muted">Pantau perjalanan uangmu hari ini.</p></div><div class="actions"><button data-modal="transactionModal" class="button primary">＋ Catat transaksi</button></div></div>
-<div class="summary-grid"><div class="summary-card balance"><span>Saldo bulan ini</span><strong>Rp {{ number_format($income-$expense,0,',','.') }}</strong><small>{{ $monthNames[$month] }} {{ $year }}</small></div><div class="summary-card"><span class="summary-label green"><x-heroicon-c-arrow-trending-up aria-hidden="true" /><b>Pemasukan</b></span><strong>Rp {{ number_format($income,0,',','.') }}</strong><small>Total masuk</small></div><div class="summary-card"><span class="summary-label red"><x-heroicon-c-arrow-trending-down aria-hidden="true" /><b>Pengeluaran</b></span><strong>Rp {{ number_format($expense,0,',','.') }}</strong><small>Total keluar</small></div></div>
-<div class="section-head"><div><h2>Transaksi terbaru</h2><p class="muted">{{ $monthNames[$month] }} {{ $year }}</p></div><div class="ledger-controls"><form method="get" class="period-filter"><input type="hidden" name="view" value="{{ request('view','modern') }}"><select name="month" aria-label="Pilih bulan" onchange="this.form.submit()">@foreach($monthNames as $number=>$name)<option value="{{ $number }}" @selected($month===$number)>{{ $name }}</option>@endforeach</select><select name="year" aria-label="Pilih tahun" onchange="this.form.submit()">@for($y=now()->year-2;$y<=now()->year+2;$y++)<option value="{{ $y }}" @selected($year===$y)>{{ $y }}</option>@endfor</select></form><div class="view-toggle"><a href="?view=modern&month={{ $month }}&year={{ $year }}" class="{{ request('view','modern')==='modern'?'selected':'' }}">Modern</a><a href="?view=ledger&month={{ $month }}&year={{ $year }}" class="{{ request('view')==='ledger'?'selected':'' }}">Buku kas</a></div></div></div>
-@if(request('view')==='ledger')<div class="ledger-wrap"><div class="ledger-title">Catatan Keuangan Bulan : {{ $monthNames[$month] }} {{ $year }}</div><table class="ledger"><thead><tr><th>Tanggal</th><th>Keterangan</th><th>Debit</th><th>Kredit</th></tr></thead><tbody>@if($carryForward>0)<tr class="carry-forward"><td>{{ sprintf('%02d/01/%04d',$month,$year) }}</td><td><strong>Saldo awal bulan</strong><small>Dibawa dari sisa {{ $monthNames[$month === 1 ? 12 : $month - 1] }}</small></td><td>Rp {{ number_format($carryForward,0,',','.') }}</td><td>-</td></tr>@endif @forelse($transactions as $t)<tr class="ledger-item" data-detail data-description="{{ $t->description }}" data-category="{{ $t->category->name }}" data-date="{{ $t->transaction_date->format('d M Y') }}" data-type="{{ $t->type }}" data-amount="{{ number_format($t->amount,0,',','.') }}" data-receipt="{{ $t->receipt_path ? asset('storage/'.$t->receipt_path) : '' }}"><td>{{ $t->transaction_date->format('d/m/Y') }}</td><td>{{ $t->description }}@if($t->receipt_path) <span class="receipt-badge">📎</span>@endif</td><td>{{ $t->type==='income'?'Rp '.number_format($t->amount,0,',','.'):'-' }}</td><td>{{ $t->type==='expense'?'Rp '.number_format($t->amount,0,',','.'):'-' }}</td></tr>@empty @if($carryForward<=0)<tr><td colspan="4">Belum ada catatan.</td></tr>@endif @endforelse</tbody><tfoot><tr><th colspan="2">Total</th><th>Rp {{ number_format($ledgerIncome,0,',','.') }}</th><th>Rp {{ number_format($expense,0,',','.') }}</th></tr><tr class="remaining"><th colspan="2">Sisa Uang</th><th colspan="2">Rp {{ number_format($ledgerIncome-$expense,0,',','.') }}</th></tr></tfoot></table></div>@else<div class="transactions">@forelse($transactions as $t)<div class="transaction-row" data-detail data-description="{{ $t->description }}" data-category="{{ $t->category->name }}" data-date="{{ $t->transaction_date->format('d M Y') }}" data-type="{{ $t->type }}" data-amount="{{ number_format($t->amount,0,',','.') }}" data-receipt="{{ $t->receipt_path ? asset('storage/'.$t->receipt_path) : '' }}"><div class="category-icon {{ $t->type }}"><span class="material-symbols-rounded">{{ $t->category->icon ?? ($t->type === 'income' ? 'trending_up' : 'trending_down') }}</span></div><div class="transaction-info"><strong>{{ $t->description }}</strong><span>{{ $t->category->name }} · {{ $t->transaction_date->format('d M Y') }} @if($t->receipt_path) · 📎 Bukti @endif</span></div><strong class="amount {{ $t->type }}">{{ $t->type==='income'?'+':'-' }} Rp {{ number_format($t->amount,0,',','.') }}</strong><form method="post" action="{{ route('transactions.destroy',$t) }}">@csrf @method('DELETE')<button class="icon-button" title="Hapus">×</button></form></div>@empty<div class="empty-state"><div>◌</div><h3>Belum ada transaksi</h3><p>Mulai catat pemasukan atau pengeluaranmu.</p></div>@endforelse</div>@endif
-<dialog id="transactionModal"><div class="modal-head"><div><p class="eyebrow">TRANSAKSI BARU</p><h2>Catat arus kas</h2></div><button class="close icon-button">×</button></div><form method="post" action="{{ route('transactions.store') }}" enctype="multipart/form-data" class="form-stack">@csrf
-<label>Jenis transaksi<div class="modern-select" data-select data-name="type"><input type="hidden" name="type" value="income" required><button type="button" class="modern-select-trigger"><span data-select-label>Pemasukan</span><span class="select-chevron">⌄</span></button><div class="modern-select-menu"><button type="button" data-value="income">Pemasukan<span>Pemasukan uang</span></button><button type="button" data-value="expense">Pengeluaran<span>Uang yang digunakan</span></button></div></div></label>
-<label>Kategori<div class="modern-select" data-select data-name="category_id"><input type="hidden" name="category_id" value="{{ optional(auth()->user()->categories()->where('is_active',true)->where('type','income')->orderBy('name')->first())->id }}" required><button type="button" class="modern-select-trigger"><span data-select-label>{{ optional(auth()->user()->categories()->where('is_active',true)->where('type','income')->orderBy('name')->first())->name ?? 'Pilih kategori' }}</span><span class="select-chevron">⌄</span></button><div class="modern-select-menu">@foreach(auth()->user()->categories()->where('is_active',true)->orderBy('name')->get() as $c)<button type="button" data-value="{{ $c->id }}" data-type="{{ $c->type }}" @if($c->type !== 'income') hidden @endif>{{ $c->name }}<span>{{ $c->type==='income'?'Pemasukan':'Pengeluaran' }}</span></button>@endforeach</div></div></label>
-<label>Tanggal<input type="date" name="transaction_date" value="{{ now()->format('Y-m-d') }}" required></label><label>Keterangan<input name="description" placeholder="Contoh: Gaji bulan Juli" required></label><label>Nominal<input type="text" name="amount" inputmode="numeric" data-rupiah placeholder="Rp 0" autocomplete="off" required></label><label class="receipt-upload">Bukti transaksi <span class="muted">(opsional, maks. 5 MB)</span><input type="file" name="receipt" accept="image/jpeg,image/png,image/webp" data-receipt-input><span class="receipt-preview" data-receipt-preview>＋ Pilih foto struk atau bukti transaksi</span></label><button class="button primary wide">Simpan transaksi</button></form></dialog>
-<dialog id="transactionDetailModal"><div class="modal-head"><div><p class="eyebrow">DETAIL TRANSAKSI</p><h2 data-detail-title>Transaksi</h2></div><button class="close icon-button">×</button></div><div class="detail-content"><div class="detail-type" data-detail-type></div><div class="detail-amount" data-detail-amount></div><div class="detail-meta"><div><small>Kategori</small><strong data-detail-category></strong></div><div><small>Tanggal</small><strong data-detail-date></strong></div></div><div class="detail-description"><small>Keterangan</small><p data-detail-description></p></div><div class="detail-receipt" data-detail-receipt-wrap><small>Bukti transaksi</small><img data-detail-receipt alt="Bukti transaksi"></div><div class="detail-no-receipt" data-detail-no-receipt>Tidak ada foto bukti transaksi.</div></div></dialog></div>@endsection
+    @php($monthNames = [1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April', 5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus', 9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'])
+    <div class="page-heading">
+        <div>
+            <p class="eyebrow">RINGKASAN KEUANGAN</p>
+            <h1>Halo, {{ auth()->user()->name }} <span>👋</span></h1>
+            <p class="muted">Pantau perjalanan uangmu hari ini.</p>
+        </div>
+        <div class="actions"><button data-modal="transactionModal" class="button primary">＋ Catat transaksi</button></div>
+    </div>
+    <div class="summary-grid">
+        <div class="summary-card balance"><span>Saldo bulan ini</span><strong>Rp
+                {{ number_format($income - $expense, 0, ',', '.') }}</strong><small>{{ $monthNames[$month] }}
+                {{ $year }}</small></div>
+        <div class="summary-card"><span class="summary-label green"><x-heroicon-c-arrow-trending-up
+                    aria-hidden="true" /><b>Pemasukan</b></span><strong>Rp
+                {{ number_format($income, 0, ',', '.') }}</strong><small>Total masuk</small></div>
+        <div class="summary-card"><span class="summary-label red"><x-heroicon-c-arrow-trending-down
+                    aria-hidden="true" /><b>Pengeluaran</b></span><strong>Rp
+                {{ number_format($expense, 0, ',', '.') }}</strong><small>Total keluar</small></div>
+    </div>
+    <div class="section-head">
+        <div>
+            <h2>Transaksi terbaru</h2>
+            <p class="muted">{{ $monthNames[$month] }} {{ $year }}</p>
+        </div>
+        <div class="ledger-controls">
+            <form method="get" class="period-filter"><input type="hidden" name="view"
+                    value="{{ request('view', 'modern') }}"><select name="month" aria-label="Pilih bulan"
+                    onchange="this.form.submit()">
+                    @foreach ($monthNames as $number => $name)
+                        <option value="{{ $number }}" @selected($month === $number)>{{ $name }}</option>
+                    @endforeach
+                </select>
+                <select name="year" aria-label="Pilih tahun" onchange="this.form.submit()">
+                    @for ($y = now()->year - 7; $y <= now()->year + 2; $y++)
+                        <option value="{{ $y }}" @selected($year === $y)>{{ $y }}</option>
+                    @endfor
+                </select>
+            </form>
+            <div class="view-toggle"><a href="?view=modern&month={{ $month }}&year={{ $year }}"
+                    class="{{ request('view', 'modern') === 'modern' ? 'selected' : '' }}">Modern</a><a
+                    href="?view=ledger&month={{ $month }}&year={{ $year }}"
+                    class="{{ request('view') === 'ledger' ? 'selected' : '' }}">Buku kas</a></div>
+        </div>
+    </div>
+    @if (request('view') === 'ledger')
+        <div class="ledger-wrap">
+            <div class="ledger-title">Catatan Keuangan Bulan : {{ $monthNames[$month] }} {{ $year }}</div>
+            <table class="ledger">
+                <thead>
+                    <tr>
+                        <th>Tanggal</th>
+                        <th>Keterangan</th>
+                        <th>Debit</th>
+                        <th>Kredit</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if ($carryForward > 0)
+                        <tr class="carry-forward">
+                            <td>{{ sprintf('%02d/01/%04d', $month, $year) }}</td>
+                            <td><strong>Saldo awal bulan</strong><small>Dibawa dari sisa
+                                    {{ $monthNames[$month === 1 ? 12 : $month - 1] }}</small></td>
+                            <td>Rp {{ number_format($carryForward, 0, ',', '.') }}</td>
+                            <td>-</td>
+                        </tr>
+                        @endif @forelse($transactions as $t)
+                            <tr class="ledger-item" data-detail data-description="{{ $t->description }}"
+                                data-category="{{ $t->category->name }}"
+                                data-date="{{ $t->transaction_date->format('d M Y') }}" data-type="{{ $t->type }}"
+                                data-amount="{{ number_format($t->amount, 0, ',', '.') }}"
+                                data-receipt="{{ $t->receipt_path ? asset('storage/' . $t->receipt_path) : '' }}">
+                                <td>{{ $t->transaction_date->format('d/m/Y') }}</td>
+                                <td>{{ $t->description }}@if ($t->receipt_path)
+                                        <span class="receipt-badge">📎</span>
+                                    @endif
+                                </td>
+                                <td>{{ $t->type === 'income' ? 'Rp ' . number_format($t->amount, 0, ',', '.') : '-' }}</td>
+                                <td>{{ $t->type === 'expense' ? 'Rp ' . number_format($t->amount, 0, ',', '.') : '-' }}</td>
+                            </tr>@empty @if ($carryForward <= 0)
+                                <tr>
+                                    <td colspan="4">Belum ada catatan.</td>
+                                </tr>
+                            @endif
+                        @endforelse
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th colspan="2">Total</th>
+                        <th>Rp {{ number_format($ledgerIncome, 0, ',', '.') }}</th>
+                        <th>Rp {{ number_format($expense, 0, ',', '.') }}</th>
+                    </tr>
+                    <tr class="remaining">
+                        <th colspan="2">Sisa Uang</th>
+                        <th colspan="2">Rp {{ number_format($ledgerIncome - $expense, 0, ',', '.') }}</th>
+                    </tr>
+                </tfoot>
+            </table>
+    </div>@else<div class="transactions">
+            @forelse($transactions as $t)
+                <div class="transaction-row" data-detail data-description="{{ $t->description }}"
+                    data-category="{{ $t->category->name }}" data-date="{{ $t->transaction_date->format('d M Y') }}"
+                    data-type="{{ $t->type }}" data-amount="{{ number_format($t->amount, 0, ',', '.') }}"
+                    data-receipt="{{ $t->receipt_path ? asset('storage/' . $t->receipt_path) : '' }}">
+                    <div class="category-icon {{ $t->type }}"><span
+                            class="material-symbols-rounded">{{ $t->category->icon ?? ($t->type === 'income' ? 'trending_up' : 'trending_down') }}</span>
+                    </div>
+                    <div class="transaction-info"><strong>{{ $t->description }}</strong><span>{{ $t->category->name }} ·
+                            {{ $t->transaction_date->format('d M Y') }} @if ($t->receipt_path)
+                                · 📎 Bukti
+                            @endif
+                        </span>
+                    </div><strong class="amount {{ $t->type }}">{{ $t->type === 'income' ? '+' : '-' }} Rp
+                        {{ number_format($t->amount, 0, ',', '.') }}</strong>
+                    <form method="post" action="{{ route('transactions.destroy', $t) }}">@csrf @method('DELETE')<button
+                            class="icon-button" title="Hapus">×</button></form>
+            </div>@empty<div class="empty-state">
+                    <div>◌</div>
+                    <h3>Belum ada transaksi</h3>
+                    <p>Mulai catat pemasukan atau pengeluaranmu.</p>
+                </div>
+            @endforelse
+        </div>
+    @endif
+    <dialog id="transactionModal">
+        <div class="modal-head">
+            <div>
+                <p class="eyebrow">TRANSAKSI BARU</p>
+                <h2>Catat arus kas</h2>
+            </div><button class="close icon-button">×</button>
+        </div>
+        <form method="post" action="{{ route('transactions.store') }}" enctype="multipart/form-data" class="form-stack">
+            @csrf
+            <label>Jenis transaksi<div class="modern-select" data-select data-name="type"><input type="hidden"
+                        name="type" value="income" required><button type="button" class="modern-select-trigger"><span
+                            data-select-label>Pemasukan</span><span class="select-chevron">⌄</span></button>
+                    <div class="modern-select-menu"><button type="button" data-value="income">Pemasukan<span>Pemasukan
+                                uang</span></button><button type="button" data-value="expense">Pengeluaran<span>Uang yang
+                                digunakan</span></button></div>
+                </div></label>
+            <label>Kategori<div class="modern-select" data-select data-name="category_id"><input type="hidden"
+                        name="category_id"
+                        value="{{ optional(auth()->user()->categories()->where('is_active', true)->where('type', 'income')->orderBy('name')->first())->id }}"
+                        required><button type="button" class="modern-select-trigger"><span
+                            data-select-label>{{ optional(auth()->user()->categories()->where('is_active', true)->where('type', 'income')->orderBy('name')->first())->name ?? 'Pilih kategori' }}</span><span
+                            class="select-chevron">⌄</span></button>
+                    <div class="modern-select-menu">
+                        @foreach (auth()->user()->categories()->where('is_active', true)->orderBy('name')->get() as $c)
+                            <button type="button" data-value="{{ $c->id }}" data-type="{{ $c->type }}"
+                                @if ($c->type !== 'income') hidden @endif>{{ $c->name }}<span>{{ $c->type === 'income' ? 'Pemasukan' : 'Pengeluaran' }}</span></button>
+                        @endforeach
+                    </div>
+                </div></label>
+            <label>Tanggal<input type="date" name="transaction_date" value="{{ now()->format('Y-m-d') }}"
+                    required></label><label>Keterangan<input name="description" placeholder="Contoh: Gaji bulan Juli"
+                    required></label><label>Nominal<input type="text" name="amount" inputmode="numeric" data-rupiah
+                    placeholder="Rp 0" autocomplete="off" required></label><label class="receipt-upload">Bukti transaksi
+                <span class="muted">(opsional, maks. 5 MB)</span><input type="file" name="receipt"
+                    accept="image/jpeg,image/png,image/webp" data-receipt-input><span class="receipt-preview"
+                    data-receipt-preview>＋ Pilih foto struk atau bukti transaksi</span></label><button
+                class="button primary wide">Simpan transaksi</button>
+        </form>
+    </dialog>
+    <dialog id="transactionDetailModal">
+        <div class="modal-head">
+            <div>
+                <p class="eyebrow">DETAIL TRANSAKSI</p>
+                <h2 data-detail-title>Transaksi</h2>
+            </div><button class="close icon-button">×</button>
+        </div>
+        <div class="detail-content">
+            <div class="detail-type" data-detail-type></div>
+            <div class="detail-amount" data-detail-amount></div>
+            <div class="detail-meta">
+                <div><small>Kategori</small><strong data-detail-category></strong></div>
+                <div><small>Tanggal</small><strong data-detail-date></strong></div>
+            </div>
+            <div class="detail-description"><small>Keterangan</small>
+                <p data-detail-description></p>
+            </div>
+            <div class="detail-receipt" data-detail-receipt-wrap><small>Bukti transaksi</small><img data-detail-receipt
+                    alt="Bukti transaksi"></div>
+            <div class="detail-no-receipt" data-detail-no-receipt>Tidak ada foto bukti transaksi.</div>
+        </div>
+    </dialog>
+</div>@endsection
