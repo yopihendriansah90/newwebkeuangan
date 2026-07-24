@@ -113,7 +113,7 @@
                         </span>
                     </div><strong class="amount {{ $t->type }}">{{ $t->type === 'income' ? '+' : '-' }} Rp
                         {{ number_format($t->amount, 0, ',', '.') }}</strong>
-                    <form method="post" action="{{ route('transactions.destroy', $t) }}">@csrf @method('DELETE')<button
+                    <form method="post" action="{{ route('transactions.destroy', $t) }}" data-modern-delete>@csrf @method('DELETE')<button
                             class="icon-button" title="Hapus">×</button></form>
             </div>@empty<div class="empty-state">
                     <div>◌</div>
