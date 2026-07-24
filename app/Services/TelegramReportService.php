@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Transaction;
+use App\Models\PendingTransaction;
 use App\Models\Wallet;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -13,6 +14,9 @@ class TelegramReportService
 
     public function respond(Wallet $wallet, string $input, Carbon $now): ?string
     {
+        // Saat ada field transaksi yang sedang diedit, jangan anggap pesan
+        // seperti "pemasukan" atau "kemarin" sebagai permintaan laporan.
+        if ($this->hasPendingEdit()) return null;
         $text = mb_strtolower(trim($input));
         if (!$this->isReportRequest($text)) return null;
 
@@ -49,6 +53,18 @@ class TelegramReportService
         }
 
         return $this->summary($wallet, $from, $to, $period, true);
+    }
+
+    private function hasPendingEdit(): bool
+    {
+        $chatId = (string) request()->input('message.chat.id', '');
+        if ($chatId === '') return false;
+
+        return PendingTransaction::where('chat_id', $chatId)
+            ->where('status', 'pending')
+            ->latest()
+            ->get()
+            ->contains(fn (PendingTransaction $pending): bool => in_array(data_get($pending->payload, 'editing'), ['type', 'category', 'date', 'amount', 'description'], true));
     }
 
     private function isReportRequest(string $text): bool
