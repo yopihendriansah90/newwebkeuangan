@@ -14,7 +14,7 @@ class GroqTransactionParser
         if (!$apiKey) throw new RuntimeException('API key Groq belum dikonfigurasi.');
 
         $model = SystemSetting::read('groq_model', config('services.groq.model', 'llama-3.3-70b-versatile'));
-        $response = Http::timeout(30)->withToken($apiKey)->post('https://api.groq.com/openai/v1/chat/completions', [
+        $response = Http::connectTimeout(15)->timeout(60)->retry(3, 1200)->withToken($apiKey)->post('https://api.groq.com/openai/v1/chat/completions', [
             // json_schema tidak didukung oleh semua model Groq. json_object
             // lebih kompatibel, sementara struktur detail tetap diarahkan lewat prompt.
             'model'=>$model, 'temperature'=>0, 'response_format'=>['type'=>'json_object'],
@@ -51,7 +51,7 @@ class GroqTransactionParser
 
         $model = SystemSetting::read('groq_vision_model', config('services.groq.vision_model'));
         if ($model === 'meta-llama/llama-4-scout-17b-16e-instruct') $model = 'qwen/qwen3.6-27b';
-        $response = Http::timeout(60)->withToken($apiKey)->post('https://api.groq.com/openai/v1/chat/completions', [
+        $response = Http::connectTimeout(15)->timeout(90)->retry(3, 1500)->withToken($apiKey)->post('https://api.groq.com/openai/v1/chat/completions', [
             'model' => $model,
             'temperature' => 0,
             'max_completion_tokens' => 1024,
