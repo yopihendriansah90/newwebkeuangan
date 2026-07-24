@@ -50,6 +50,7 @@
             <table class="ledger">
                 <thead>
                     <tr>
+                        <th>No.</th>
                         <th>Tanggal</th>
                         <th>Keterangan</th>
                         <th>Debit</th>
@@ -59,18 +60,20 @@
                 <tbody>
                     @if ($carryForward > 0)
                         <tr class="carry-forward">
+                            <td class="ledger-number">-</td>
                             <td>{{ sprintf('%02d/01/%04d', $month, $year) }}</td>
                             <td><strong>Saldo awal bulan</strong><small>Dibawa dari sisa
                                     {{ $monthNames[$month === 1 ? 12 : $month - 1] }}</small></td>
                             <td>Rp {{ number_format($carryForward, 0, ',', '.') }}</td>
                             <td>-</td>
                         </tr>
-                        @endif @forelse($transactions as $t)
+                        @endif @forelse($transactions as $index => $t)
                             <tr class="ledger-item" data-detail data-description="{{ $t->description }}"
                                 data-category="{{ $t->category->name }}"
                                 data-date="{{ $t->transaction_date->format('d M Y') }}" data-type="{{ $t->type }}"
                                 data-amount="{{ number_format($t->amount, 0, ',', '.') }}"
                                 data-receipt="{{ $t->receipt_path ? route('transactions.receipt', $t) : '' }}">
+                                <td class="ledger-number">{{ sprintf('%02d', $index + 1) }}</td>
                                 <td>{{ $t->transaction_date->format('d/m/Y') }}</td>
                                 <td>{{ $t->description }}@if ($t->receipt_path)
                                         <span class="receipt-badge">📎</span>
@@ -80,19 +83,19 @@
                                 <td>{{ $t->type === 'expense' ? 'Rp ' . number_format($t->amount, 0, ',', '.') : '-' }}</td>
                             </tr>@empty @if ($carryForward <= 0)
                                 <tr>
-                                    <td colspan="4">Belum ada catatan.</td>
+                                    <td colspan="5">Belum ada catatan.</td>
                                 </tr>
                             @endif
                         @endforelse
                 </tbody>
                 <tfoot>
                     <tr>
-                        <th colspan="2">Total</th>
+                        <th colspan="3">Total</th>
                         <th>Rp {{ number_format($ledgerIncome, 0, ',', '.') }}</th>
                         <th>Rp {{ number_format($expense, 0, ',', '.') }}</th>
                     </tr>
                     <tr class="remaining">
-                        <th colspan="2">Sisa Uang</th>
+                        <th colspan="3">Sisa Uang</th>
                         <th colspan="2">Rp {{ number_format($ledgerIncome - $expense, 0, ',', '.') }}</th>
                     </tr>
                 </tfoot>
