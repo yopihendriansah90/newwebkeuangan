@@ -3,10 +3,14 @@ use App\Http\Controllers\AuthController; use App\Http\Controllers\FinanceControl
 use App\Http\Controllers\TelegramWebhookController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\AnalysisController;
+use App\Models\Transaction;
+use App\Models\Wallet;
+use Illuminate\Support\Facades\Storage;
 Route::post('/telegram/webhook',[TelegramWebhookController::class,'handle'])->name('telegram.webhook');
 Route::get('/', fn()=>auth()->check()?redirect('/dashboard'):view('auth.login'));
 Route::middleware('guest')->group(function(){ Route::get('/login',[AuthController::class,'show'])->name('login'); Route::post('/login',[AuthController::class,'login']); });
 Route::middleware('auth')->group(function(){
+ Route::get('/transactions/{transaction}/receipt', function (Transaction $transaction) { abort_unless($transaction->wallet_id === optional(Wallet::shared())->id, 404); $path = $transaction->receipt_path; $disk = Storage::disk('local'); if (!$path || !$disk->exists($path)) $disk = Storage::disk('legacy_public'); abort_unless($path && $disk->exists($path), 404); return response()->file($disk->path($path)); })->name('transactions.receipt');
  Route::post('/logout',[AuthController::class,'logout'])->name('logout'); Route::get('/dashboard',[FinanceController::class,'index'])->name('dashboard'); Route::get('/reports/ledger/export',[FinanceController::class,'exportLedger'])->name('reports.ledger.export'); Route::get('/reports/ledger/pdf',[FinanceController::class,'exportLedgerPdf'])->name('reports.ledger.pdf'); Route::post('/transactions',[FinanceController::class,'store'])->name('transactions.store'); Route::delete('/transactions/{transaction}',[FinanceController::class,'destroy'])->name('transactions.destroy');
  Route::get('/categories',[FinanceController::class,'categories'])->name('categories'); Route::post('/categories',[FinanceController::class,'categoryStore'])->name('categories.store'); Route::patch('/categories/{category}',[FinanceController::class,'categoryUpdate'])->name('categories.update'); Route::delete('/categories/{category}',[FinanceController::class,'categoryDestroy'])->name('categories.destroy');
  Route::get('/members',[FinanceController::class,'members'])->name('members'); Route::post('/members',[FinanceController::class,'memberStore'])->name('members.store'); Route::delete('/members/{user}',[FinanceController::class,'memberDestroy'])->name('members.destroy');

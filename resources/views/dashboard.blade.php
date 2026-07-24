@@ -70,7 +70,7 @@
                                 data-category="{{ $t->category->name }}"
                                 data-date="{{ $t->transaction_date->format('d M Y') }}" data-type="{{ $t->type }}"
                                 data-amount="{{ number_format($t->amount, 0, ',', '.') }}"
-                                data-receipt="{{ $t->receipt_path ? asset('storage/' . $t->receipt_path) : '' }}">
+                                data-receipt="{{ $t->receipt_path ? route('transactions.receipt', $t) : '' }}">
                                 <td>{{ $t->transaction_date->format('d/m/Y') }}</td>
                                 <td>{{ $t->description }}@if ($t->receipt_path)
                                         <span class="receipt-badge">📎</span>
@@ -102,7 +102,7 @@
                 <div class="transaction-row" data-detail data-description="{{ $t->description }}"
                     data-category="{{ $t->category->name }}" data-date="{{ $t->transaction_date->format('d M Y') }}"
                     data-type="{{ $t->type }}" data-amount="{{ number_format($t->amount, 0, ',', '.') }}"
-                    data-receipt="{{ $t->receipt_path ? asset('storage/' . $t->receipt_path) : '' }}">
+                    data-receipt="{{ $t->receipt_path ? route('transactions.receipt', $t) : '' }}">
                     <div class="category-icon {{ $t->type }}"><span
                             class="material-symbols-rounded">{{ $t->category->icon ?? ($t->type === 'income' ? 'trending_up' : 'trending_down') }}</span>
                     </div>

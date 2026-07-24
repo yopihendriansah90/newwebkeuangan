@@ -40,6 +40,7 @@ class GroqTransactionParser
             $parsed['type'] = $parsed['intent'];
             $parsed['intent'] = 'create_transaction';
         }
+        $parsed['missing_fields'] = $this->missingFields($parsed);
         return array_merge(['intent'=>'unknown','type'=>'unknown','description'=>'','amount'=>0,'date_expression'=>'','category'=>'','confidence'=>0,'missing_fields'=>[]], $parsed);
     }
 
@@ -74,8 +75,16 @@ class GroqTransactionParser
         $parsed['amount'] ??= $parsed['nominal'] ?? 0;
         $parsed['date_expression'] ??= $parsed['tanggal'] ?? 'hari ini';
         $parsed['category'] ??= $parsed['kategori'] ?? '';
-        $parsed['missing_fields'] ??= [];
+        $parsed['missing_fields'] = $this->missingFields($parsed);
         return array_merge(['intent'=>'create_transaction','type'=>'expense','description'=>'Pembayaran dari nota','amount'=>0,'date_expression'=>'hari ini','category'=>'','confidence'=>0,'missing_fields'=>[]], $parsed);
+    }
+
+    private function missingFields(array $parsed): array
+    {
+        $fields = is_array($parsed['missing_fields'] ?? null) ? $parsed['missing_fields'] : [];
+        if ((int) ($parsed['amount'] ?? 0) < 1) $fields[] = 'amount';
+        if (trim((string) ($parsed['description'] ?? '')) === '') $fields[] = 'description';
+        return array_values(array_unique(array_filter(array_map('strval', $fields))));
     }
 
     private function decodeJsonResponse(mixed $content, string $error): array

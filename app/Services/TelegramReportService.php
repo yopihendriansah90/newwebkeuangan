@@ -64,7 +64,7 @@ class TelegramReportService
             ->where('status', 'pending')
             ->latest()
             ->get()
-            ->contains(fn (PendingTransaction $pending): bool => in_array(data_get($pending->payload, 'editing'), ['type', 'category', 'date', 'amount', 'description'], true));
+            ->contains(fn (PendingTransaction $pending): bool => $pending->state() === 'editing');
     }
 
     private function isReportRequest(string $text): bool

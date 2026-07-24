@@ -94,12 +94,12 @@ class FinanceController extends Controller
         $data = $request->validate(['type' => ['required', Rule::in(['income', 'expense'])], 'category_id' => 'required|exists:categories,id', 'transaction_date' => 'required|date', 'description' => 'required|max:255', 'amount' => 'required|numeric|min:1', 'receipt' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120']);
         $category = Category::where('id', $data['category_id'])->where('wallet_id', $wallet->id)->where('type', $data['type'])->where('is_active', true)->firstOrFail();
         $data['user_id'] = auth()->id(); $data['wallet_id'] = $wallet->id;
-        if ($request->hasFile('receipt')) $data['receipt_path'] = $request->file('receipt')->store('receipts', 'public');
+        if ($request->hasFile('receipt')) $data['receipt_path'] = $request->file('receipt')->store('receipts', 'local');
         unset($data['receipt']); Transaction::create($data);
         return back()->with('success', 'Transaksi berhasil ditambahkan.');
     }
 
-    public function destroy(Transaction $transaction) { if ($transaction->receipt_path) Storage::disk('public')->delete($transaction->receipt_path); $transaction->delete(); return back()->with('success', 'Transaksi dihapus.'); }
+    public function destroy(Transaction $transaction) { if ($transaction->receipt_path) { Storage::disk('local')->delete($transaction->receipt_path); Storage::disk('public')->delete($transaction->receipt_path); } $transaction->delete(); return back()->with('success', 'Transaksi dihapus.'); }
     public function categories() { $categories = Category::where('wallet_id', $this->wallet()->id)->orderBy('type')->orderBy('name')->get(); return view('categories', compact('categories')); }
     public function members() { $wallet = $this->wallet(); $members = $wallet->members()->orderBy('name')->get(); return view('members', compact('wallet', 'members')); }
     public function memberStore(Request $request) { $wallet = $this->wallet(); $data = $request->validate(['name' => 'required|max:100', 'username' => ['required', 'alpha_dash', 'max:50', Rule::unique('users')], 'password' => 'required|min:6|confirmed']); $member = \App\Models\User::create(['name' => $data['name'], 'username' => $data['username'], 'email' => $data['username'].'@keuangan.local', 'password' => $data['password']]); if (!$wallet->members()->where('user_id', $member->id)->exists()) $wallet->members()->attach($member->id, ['role' => 'member']); return back()->with('success', 'Akun anggota berhasil dibuat.'); }
