@@ -1,4 +1,53 @@
 <?php
 namespace App\Services;
 use App\Models\Category; use App\Models\Wallet;
-class CategoryResolver { public function find(Wallet $wallet,string $type,string $input):?Category { if(!in_array($type,['income','expense'],true))return null; $value=mb_strtolower(trim($input)); $categories=$wallet->categories()->where('type',$type)->where('is_active',true)->get(); $exact=$categories->first(fn($category)=>mb_strtolower($category->name)===$value); if($exact)return $exact; $aliases=['income'=>['gaji'=>['gaji','upah','salary'],'bonus'=>['bonus','thr','tunjangan']],'expense'=>['Makanan'=>['makan','makanan','jajan','sarapan','lunch','dinner'],'Transportasi'=>['bensin','transport','ojek','grab','gojek','parkir'],'Tagihan'=>['listrik','air','internet','tagihan','pulsa']]]; foreach($aliases[$type]??[] as $name=>$words){foreach($words as $word)if(str_contains($value,$word)){ $found=$categories->first(fn($category)=>mb_strtolower($category->name)==mb_strtolower($name)); if($found)return $found; }} return $categories->first(fn($category)=>str_contains($value,mb_strtolower($category->name))||str_contains(mb_strtolower($category->name),$value)); } }
+class CategoryResolver
+{
+    public function find(Wallet $wallet, string $type, string $input): ?Category
+    {
+        if (! in_array($type, ['income', 'expense'], true)) return null;
+
+        $value = mb_strtolower(trim($input));
+        $categories = $wallet->categories()->where('type', $type)->where('is_active', true)->get();
+        $exact = $categories->first(fn ($category) => mb_strtolower($category->name) === $value);
+        if ($exact) return $exact;
+
+        $aliases = [
+            'income' => ['gaji' => ['gaji', 'upah', 'salary'], 'bonus' => ['bonus', 'thr', 'tunjangan']],
+            'expense' => [
+                'Makanan' => ['makan', 'makanan', 'jajan', 'sarapan', 'lunch', 'dinner'],
+                'Transportasi' => ['bensin', 'transport', 'ojek', 'grab', 'gojek', 'parkir'],
+                'Tagihan' => ['listrik', 'air', 'internet', 'tagihan', 'pulsa'],
+            ],
+        ];
+
+        foreach ($aliases[$type] ?? [] as $name => $words) {
+            foreach ($words as $word) {
+                if (str_contains($value, $word)) {
+                    $found = $categories->first(fn ($category) => mb_strtolower($category->name) === mb_strtolower($name));
+                    if ($found) return $found;
+                }
+            }
+        }
+
+        return $categories->first(fn ($category) => str_contains($value, mb_strtolower($category->name)) || str_contains(mb_strtolower($category->name), $value));
+    }
+
+    public function fallback(Wallet $wallet, string $type, int $userId): Category
+    {
+        $category = Category::where('wallet_id', $wallet->id)->where('type', $type)->where('name', 'Lainnya')->first();
+        if ($category) {
+            $category->update(['is_active' => true]);
+            return $category;
+        }
+
+        return Category::create([
+            'wallet_id' => $wallet->id,
+            'user_id' => $userId,
+            'name' => 'Lainnya',
+            'type' => $type,
+            'color' => $type === 'income' ? '#10b981' : '#ef4444',
+            'is_active' => true,
+        ]);
+    }
+}
