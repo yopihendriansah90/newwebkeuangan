@@ -25,8 +25,7 @@ class GroqTransactionParser
         ]);
         if (!$response->successful()) throw new RuntimeException($response->json('error.message','Groq gagal memproses pesan.'));
         $content = $response->json('choices.0.message.content');
-        $parsed = is_string($content) ? json_decode($content, true) : $content;
-        if (!is_array($parsed) || json_last_error() !== JSON_ERROR_NONE) throw new RuntimeException('Respons Groq bukan JSON yang valid.');
+        $parsed = $this->decodeJsonResponse($content, 'Respons Groq bukan JSON yang valid.');
         // Beberapa model mengembalikan label berbahasa Indonesia meskipun
         // prompt meminta nama field internal berbahasa Inggris.
         $parsed['description'] ??= $parsed['jenis'] ?? $parsed['keterangan'] ?? '';
@@ -54,6 +53,8 @@ class GroqTransactionParser
         $response = Http::timeout(60)->withToken($apiKey)->post('https://api.groq.com/openai/v1/chat/completions', [
             'model' => $model,
             'temperature' => 0,
+            'max_completion_tokens' => 1024,
+            'response_format' => ['type' => 'json_object'],
             'messages' => [[
                 'role' => 'system',
                 'content' => 'Kamu adalah pembaca nota pembayaran dan parser transaksi keuangan Indonesia. Balas HANYA JSON valid tanpa markdown dengan field persis: intent, type, description, amount, date_expression, category, confidence, missing_fields. Baca tulisan cetak maupun tulisan tangan dengan hati-hati. Selalu anggap nota sebagai pengeluaran, kecuali jelas merupakan bukti pemasukan. amount adalah total pembayaran dalam Rupiah sebagai angka. Jika tanggal nota terbaca gunakan tanggal tersebut; jika tidak, gunakan hari ini. description ringkas dan informatif, misalnya "Belanja di Shinta Mart". category boleh Makanan, Belanja, Tagihan, Transportasi, atau kosong jika tidak yakin. Hari ini adalah '.$today.'. Bulan aktif adalah '.$activeMonth.' dan tahun aktif adalah '.$activeYear.'. Jika total tidak terbaca, amount harus 0 dan missing_fields berisi amount.',
@@ -67,9 +68,7 @@ class GroqTransactionParser
         ]);
         if (!$response->successful()) throw new RuntimeException($response->json('error.message', 'Groq gagal membaca gambar nota.'));
         $content = $response->json('choices.0.message.content');
-        $content = is_string($content) ? trim(preg_replace('/^```(?:json)?|```$/i', '', $content)) : $content;
-        $parsed = is_string($content) ? json_decode($content, true) : $content;
-        if (!is_array($parsed) || json_last_error() !== JSON_ERROR_NONE) throw new RuntimeException('Hasil pembacaan nota tidak valid.');
+        $parsed = $this->decodeJsonResponse($content, 'Hasil pembacaan nota tidak valid.');
         $parsed['type'] = 'expense';
         $parsed['intent'] = 'create_transaction';
         $parsed['description'] ??= $parsed['keterangan'] ?? 'Pembayaran dari nota';
@@ -78,5 +77,26 @@ class GroqTransactionParser
         $parsed['category'] ??= $parsed['kategori'] ?? '';
         $parsed['missing_fields'] ??= [];
         return array_merge(['intent'=>'create_transaction','type'=>'expense','description'=>'Pembayaran dari nota','amount'=>0,'date_expression'=>'hari ini','category'=>'','confidence'=>0,'missing_fields'=>[]], $parsed);
+    }
+
+    private function decodeJsonResponse(mixed $content, string $error): array
+    {
+        if (is_array($content)) return $content;
+        if (!is_string($content) || trim($content) === '') throw new RuntimeException($error);
+
+        $json = trim($content);
+        $json = preg_replace('/^```(?:json)?\s*/i', '', $json) ?? $json;
+        $json = preg_replace('/\s*```$/', '', $json) ?? $json;
+
+        // Toleransi jika model masih menambahkan kalimat pembuka/penutup.
+        $start = strpos($json, '{');
+        $end = strrpos($json, '}');
+        if ($start !== false && $end !== false && $end >= $start) {
+            $json = substr($json, $start, $end - $start + 1);
+        }
+
+        $parsed = json_decode($json, true);
+        if (!is_array($parsed) || json_last_error() !== JSON_ERROR_NONE) throw new RuntimeException($error);
+        return $parsed;
     }
 }
