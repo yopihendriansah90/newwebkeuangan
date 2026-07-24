@@ -23,6 +23,8 @@ class TransactionInputNormalizer
     public function date(?string $expression, Carbon $now, int $activeMonth, int $activeYear): string
     {
         $value = strtolower(trim((string) $expression));
+        $value = str_replace(['januari','februari','maret','april','mei','juni','juli','agustus','september','oktober','november','desember'], ['january','february','march','april','may','june','july','august','september','october','november','december'], $value);
+        $value = preg_replace_callback('/\b(jan|feb|mar|apr|jun|jul|agu|ags|sep|okt|nov|des)\b/i', static fn (array $match): string => ['jan'=>'january','feb'=>'february','mar'=>'march','apr'=>'april','jun'=>'june','jul'=>'july','agu'=>'august','ags'=>'august','sep'=>'september','okt'=>'october','nov'=>'november','des'=>'december'][strtolower($match[1])] ?? $match[1], $value) ?? $value;
         $value = preg_replace('/^(tanggal|tgl)\s+/i', '', $value);
         if ($value === '' || in_array($value, ['hari ini','hariini','today'], true)) return $now->toDateString();
         if (in_array($value, ['tadi','sekarang'], true) || str_contains($value, 'tadi')) return $now->toDateString();
@@ -31,6 +33,10 @@ class TransactionInputNormalizer
         if (preg_match('/^(\d+)\s*hari\s*(yang\s*)?lalu$/', $value, $match)) return $now->copy()->subDays((int) $match[1])->toDateString();
         if (preg_match('/^(\d{1,2})\s+bulan\s+lalu$/', $value, $match)) { $date=$now->copy()->startOfMonth()->subMonthNoOverflow(); $day=(int)$match[1]; if (checkdate($date->month,$day,$date->year)) return $date->setDay($day)->toDateString(); }
         foreach (['Y-m-d','d/m/Y','d-m-Y','d.m.Y'] as $format) { try { return Carbon::createFromFormat($format, $value)->toDateString(); } catch (\Throwable) {} }
+        if (preg_match('/^(\d{1,2})\s+(january|february|march|april|may|june|july|august|september|october|november|december)(?:\s+(\d{4}))?$/i', $value, $match)) {
+            $year = (int) ($match[3] ?? $activeYear);
+            try { return Carbon::parse($match[1].' '.$match[2].' '.$year)->toDateString(); } catch (\Throwable) {}
+        }
         foreach (['d/m','d-m','d.m'] as $format) { try { return Carbon::createFromFormat($format, $value)->setYear($activeYear)->toDateString(); } catch (\Throwable) {} }
         if (preg_match('/^\d{1,2}$/', $value)) { $day=(int)$value; if (checkdate($activeMonth,$day,$activeYear)) return Carbon::create($activeYear,$activeMonth,$day)->toDateString(); }
         throw new InvalidArgumentException('Tanggal tidak dikenali.');
