@@ -96,7 +96,7 @@ class FinanceController extends Controller
         $data['user_id'] = auth()->id(); $data['wallet_id'] = $wallet->id;
         if ($request->hasFile('receipt')) $data['receipt_path'] = $request->file('receipt')->store('receipts', 'local');
         unset($data['receipt']); Transaction::create($data);
-        return back()->with('success', 'Transaksi berhasil ditambahkan.');
+        return redirect()->route('dashboard')->with('success', 'Transaksi berhasil ditambahkan.');
     }
 
     public function destroy(Request $request, Transaction $transaction) { abort_unless($transaction->wallet_id === $this->wallet()->id, 404); if ($transaction->receipt_path) { Storage::disk('local')->delete($transaction->receipt_path); Storage::disk('public')->delete($transaction->receipt_path); } $transaction->delete(); if ($request->expectsJson()) return response()->json(['message' => 'Transaksi berhasil dihapus.']); return back()->with('success', 'Transaksi dihapus.'); }
