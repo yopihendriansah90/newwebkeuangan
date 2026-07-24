@@ -54,7 +54,6 @@ class GroqTransactionParser
             'model' => $model,
             'temperature' => 0,
             'max_completion_tokens' => 1024,
-            'response_format' => ['type' => 'json_object'],
             'messages' => [[
                 'role' => 'system',
                 'content' => 'Kamu adalah pembaca nota pembayaran dan parser transaksi keuangan Indonesia. Balas HANYA JSON valid tanpa markdown dengan field persis: intent, type, description, amount, date_expression, category, confidence, missing_fields. Baca tulisan cetak maupun tulisan tangan dengan hati-hati. Selalu anggap nota sebagai pengeluaran, kecuali jelas merupakan bukti pemasukan. amount adalah total pembayaran dalam Rupiah sebagai angka. Jika tanggal nota terbaca gunakan tanggal tersebut; jika tidak, gunakan hari ini. description ringkas dan informatif, misalnya "Belanja di Shinta Mart". category boleh Makanan, Belanja, Tagihan, Transportasi, atau kosong jika tidak yakin. Hari ini adalah '.$today.'. Bulan aktif adalah '.$activeMonth.' dan tahun aktif adalah '.$activeYear.'. Jika total tidak terbaca, amount harus 0 dan missing_fields berisi amount.',
